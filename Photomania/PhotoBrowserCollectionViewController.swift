@@ -7,6 +7,7 @@
 //
 
 import UIKit
+import Alamofire
 
 class PhotoBrowserCollectionViewController: UICollectionViewController, UICollectionViewDelegateFlowLayout {
   
@@ -23,6 +24,29 @@ class PhotoBrowserCollectionViewController: UICollectionViewController, UICollec
     super.viewDidLoad()
     
     setupView()
+    
+    let parameters: Parameters = ["consumer_key": "SDXhgTeinNasfDjmKSd18uZJErgPc5WJ056BcIUS"]
+    
+    Alamofire.request("https://api.500px.com/v1/photos", parameters: parameters).responseJSON { response in
+      guard let JSON = response.result.value else {
+        return
+      }
+      
+      guard let photoJsons = (JSON as AnyObject).value(forKey: "photos") as? [[String: Any]] else { return }
+      
+      // 将 JSON 数据转变为了更易于管理的PhotoInfo对象集合。这些对象只是简单存储了图片 ID 和 URL 属性的存储桶 (bucket)
+      
+      photoJsons.forEach {
+        guard let nsfw = $0["nsfw"] as? Bool,
+          let id = $0["id"] as? Int,
+          let url = $0["image_url"] as? String,
+          nsfw == false else { return }
+        self.photos.insert(PhotoInfo(id: id, url: url))
+      }
+      
+      self.collectionView?.reloadData()
+      
+    }
   }
   
   override func didReceiveMemoryWarning() {
@@ -37,6 +61,15 @@ class PhotoBrowserCollectionViewController: UICollectionViewController, UICollec
   
   override func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
     guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: PhotoBrowserCellIdentifier, for: indexPath) as? PhotoBrowserCollectionViewCell else { return UICollectionViewCell() }
+    
+    // 为 photos 集合中的对象创建了另外的 Alamofire 请求
+    let photoInfo = photos[photos.index(photos.startIndex, offsetBy: indexPath.item)]
+    Alamofire.request(photoInfo.url, method: .get).response {
+      dataResponse in
+      guard let data = dataResponse.data else { return }
+      let image = UIImage(data: data)
+      cell.imageView.image = image
+    }
     
     return cell
   }
