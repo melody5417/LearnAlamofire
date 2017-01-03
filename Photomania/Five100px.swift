@@ -7,8 +7,45 @@
 //
 
 import UIKit
+import Alamofire
 
 struct Five100px {
+  // 路由 为我们的API调用方法创建合适的URLRequest实例
+  enum Router: URLRequestConvertible {
+    static let baseURLString = "https://api.500px.com/v1"
+    static let consumerKey = "SDXhgTeinNasfDjmKSd18uZJErgPc5WJ056BcIUS"
+    
+    case popularPhotos(Int)
+    case photoInfo(Int, ImageSize)
+    case comments(Int, Int)
+    
+    func asURLRequest() throws -> URLRequest {
+      let result: (path: String, parameters: Parameters) = {
+        switch self {
+          // 取出热门照片列表
+        case .popularPhotos(let page):
+          let params = ["consumer_key": Router.consumerKey, "page": "\(page)", "feature": "popular", "rpp": "50",  "include_store": "store_download", "include_states": "votes"]
+          return ("/photos", params)
+          
+          // 取出某个特定照片的具体信息
+        case .photoInfo(let photoID, let imageSize):
+          let params = ["consumer_key": Router.consumerKey, "image_size": "\(imageSize.rawValue)"]
+          return ("/photos/\(photoID)", params)
+          
+          // 取出某个照片的评论
+        case .comments(let photoID, let commentsPage):
+          let params = ["consumer_key": Router.consumerKey, "comments": "1", "comments_page": "\(commentsPage)"]
+          return ("/photos/\(photoID)/comments", params)
+          
+        }
+      }()
+      let url = try Router.baseURLString.asURL()
+      let urlRequest = URLRequest(url: url.appendingPathComponent(result.path))
+      
+      return try URLEncoding.default.encode(urlRequest, with: result.parameters)
+    }
+  }
+  
   enum ImageSize: Int {
     case tiny = 1
     case small = 2
