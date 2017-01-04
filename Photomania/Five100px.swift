@@ -9,6 +9,40 @@
 import UIKit
 import Alamofire
 
+enum BackendError: Error {
+  case network(error: Error)
+  case dataSerialization(error: Error)
+  case imageSerialization(error: String)
+}
+
+extension DataRequest {
+  // 创建响应序列化方法
+  static func imageResponseSerializer() -> DataResponseSerializer<UIImage> {
+    return DataResponseSerializer { request, response, data, error in
+      guard error == nil else {
+        return .failure(BackendError.network(error: error!))
+      }
+      
+      let result = Request.serializeResponseData(response: response, data: data, error: nil)
+      
+      guard case let .success(validData) = result else {
+        return .failure(BackendError.dataSerialization(error: result.error as! AFError))
+      }
+      
+      guard let image = UIImage(data: validData, scale: UIScreen.main.scale) else {
+        return .failure(BackendError.imageSerialization(error: "数据无法被序列化，因为接收到的数据为空"))
+      }
+      
+      return .success(image)
+    }
+  }
+  
+  @discardableResult func responseImage(queue: DispatchQueue? = nil, completionHandler: @escaping (DataResponse<UIImage>) -> Void) -> Self {
+    return response(queue: queue, responseSerializer: DataRequest.imageResponseSerializer(), completionHandler: completionHandler)
+  }
+  
+}
+
 struct Five100px {
   // 路由 为我们的API调用方法创建合适的URLRequest实例
   enum Router: URLRequestConvertible {

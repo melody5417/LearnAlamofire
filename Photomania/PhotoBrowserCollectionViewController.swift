@@ -44,17 +44,21 @@ class PhotoBrowserCollectionViewController: UICollectionViewController, UICollec
   }
   
   override func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-    guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: PhotoBrowserCellIdentifier, for: indexPath) as? PhotoBrowserCollectionViewCell else { return UICollectionViewCell() }
-    
-    // 为 photos 集合中的对象创建了另外的 Alamofire 请求
-    let photoInfo = photos[photos.index(photos.startIndex, offsetBy: indexPath.item)]
-    Alamofire.request(photoInfo.url, method: .get).response {
-      dataResponse in
-      guard let data = dataResponse.data else { return }
-      let image = UIImage(data: data)
-      cell.imageView.image = image
+    guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: PhotoBrowserCellIdentifier, for: indexPath) as? PhotoBrowserCollectionViewCell else {
+      return UICollectionViewCell()
     }
     
+    let imageURL = photos[photos.index(photos.startIndex, offsetBy: indexPath.item)].url
+    // 若cell移出屏幕 则取消上次请求和图片
+    cell.imageView.image = nil
+    cell.request?.cancel()
+    cell.request = Alamofire.request(imageURL, method: .get).responseImage {
+      response in
+      guard let image = response.result.value, response.result.error == nil else {
+        return
+      }
+      cell.imageView.image = image
+    }
     return cell
   }
   
@@ -169,6 +173,9 @@ class PhotoBrowserCollectionViewController: UICollectionViewController, UICollec
 
 class PhotoBrowserCollectionViewCell: UICollectionViewCell {
   fileprivate let imageView = UIImageView()
+  
+  // 为这个cell存储Alamofire的请求来加载图片
+  fileprivate var request: Request?
   
   required init?(coder aDecoder: NSCoder) {
     super.init(coder: aDecoder)
