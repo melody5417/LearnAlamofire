@@ -8,6 +8,7 @@
 
 import UIKit
 import QuartzCore
+import Alamofire
 
 fileprivate func < <T: Comparable>(lhs: T?, rhs: T?) -> Bool {
   switch (lhs, rhs) {
@@ -45,6 +46,38 @@ class PhotoViewerViewController: UIViewController {
     super.viewDidLoad()
     
     setupView()
+    
+    loadPhoto()
+  }
+  
+  private func loadPhoto() {
+    // 接收到JSON响应数据，使用通用响应序列化方法，在JSON数据之外建立一个PhotoInfo实例。
+    Alamofire.request(Five100px.Router.photoInfo(photoID, .large)).validate().responseObject {
+      (response: DataResponse<PhotoInfo>) in
+      
+      guard let info = response.result.value else { return }
+      
+      self.photoInfo = info
+      
+      DispatchQueue.main.async {
+        self.addButtomBar()
+        self.title = info.url
+      }
+      
+      // 使用之前获取的图片序列化方法，将NSData转化为UIImage,以便在图片视图中显示。
+      // 在请求响应对象之前调用 validate， 将其与请求和响应链接，
+      // 以确认响应的状态码在默认可接受的范围（200到299).
+      Alamofire.request(info.url, method: .get).validate().responseImage {
+        response in
+        guard let image = response.result.value else { return }
+        
+        self.imageView.image = image
+        self.imageView.frame = self.centerFrameFromImage(image)
+        
+        self.spinner.stopAnimating()
+        self.centerScrollViewContents()
+      }
+    }
   }
   
   func setupView() {
