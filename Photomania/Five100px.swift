@@ -75,6 +75,40 @@ extension DataRequest {
   
 }
 
+protocol ResponseCollectionSerializable {
+  static func collection(from response: HTTPURLResponse, withRepresentation representation: Any) -> [Self]
+}
+
+extension DataRequest {
+  @discardableResult
+  func responseCollection<T: ResponseCollectionSerializable>(queue: DispatchQueue? = nil, completionHandler: @escaping (DataResponse<[T]>) -> Void) -> Self {
+    
+    let responseSerializer = DataResponseSerializer<[T]> {
+      request, response, data, error in
+      
+      guard error == nil else {
+        return .failure(BackendError.network(error: error!))
+      }
+      
+      let jsonSerializer = DataRequest.jsonResponseSerializer(options: .allowFragments)
+      let result = jsonSerializer.serializeResponse(request, response, data, nil)
+      
+      guard case let .success(jsonObject) = result else {
+        return .failure(BackendError.jsonSerialization(error: result.error!))
+      }
+      
+      guard let response = response else {
+        let reason = "Response collection could not be serialized due to nil response."
+        return .failure(BackendError.objectSerialization(error: reason))
+      }
+      
+      return .success(T.collection(from: response, withRepresentation: jsonObject))
+    }
+    
+    return response(responseSerializer: responseSerializer, completionHandler: completionHandler)
+  }
+}
+
 struct Five100px {
   // 路由 为我们的API调用方法创建合适的URLRequest实例
   enum Router: URLRequestConvertible {
@@ -248,5 +282,20 @@ struct Comment {
     userFullname = fullname
     userPictureURL = pictureURL
     commentBody = body
+  }
+}
+
+extension Comment: ResponseCollectionSerializable {
+  static func collection(from response: HTTPURLResponse, withRepresentation representation: Any) -> [Comment] {
+    var comments = [Comment]()
+    
+    guard let represences = (representation as AnyObject).value(forKey: "comments") as? [[String: Any]] else { return comments }
+    represences.forEach {
+      if let comment = Comment(JSON: $0 as AnyObject) {
+        comments.append(comment)
+      }
+    }
+    
+    return comments
   }
 }
