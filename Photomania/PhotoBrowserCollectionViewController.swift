@@ -11,7 +11,7 @@ import Alamofire
 
 class PhotoBrowserCollectionViewController: UICollectionViewController, UICollectionViewDelegateFlowLayout {
   
-  var photos = Set<PhotoInfo>()
+  var photos = [PhotoInfo]()
   
   private let refreshControl = UIRefreshControl()
   
@@ -48,6 +48,10 @@ class PhotoBrowserCollectionViewController: UICollectionViewController, UICollec
       return UICollectionViewCell()
     }
     
+    // photos中的顺序会随着插入element而改变 所以select根据index从photos set中取的photoInfo和cell生成时的可能不同
+    // 将set改为array 避免该问题
+    let id = photos[photos.index(photos.startIndex, offsetBy: indexPath.item)].id
+    cell.label.text = String(id) + "  " + String(indexPath.item)
     let imageURL = photos[photos.index(photos.startIndex, offsetBy: indexPath.item)].url
     // 若cell移出屏幕 则取消上次请求和图片
     cell.imageView.image = nil
@@ -114,6 +118,7 @@ class PhotoBrowserCollectionViewController: UICollectionViewController, UICollec
   }
   
   private func populatePhotos() {
+    
     // 2  populatePhotos() 方法在 currentPage 当中加载图片，并且使用 populatingPhotos 作为标记，以防止还在加载当前界面时加载下一个页面。
     if populatingPhotos { return }
     
@@ -146,7 +151,9 @@ class PhotoBrowserCollectionViewController: UICollectionViewController, UICollec
           }
           
           // 8 如果有人在我们滚动前向 500px.com 网站上传了新的图片，那么您所获得的新的一批照片将可能会包含一部分已下载的图片。这就是为什么我们定义 var photos = Set<PhotoInfo>() 为一个集合。由于集合内的项目必须唯一，因此重复的图片不会再次出现。
-          self.photos.insert(PhotoInfo(id: id, url: url))
+          if !self.photos.contains(PhotoInfo(id: id, url: url)) {
+            self.photos.append(PhotoInfo(id: id, url: url))
+          }
         }
         
         // 9 这里我们创建了一个 IndexPath 对象的数组，并将其插入到 collectionView 当中。
@@ -173,6 +180,7 @@ class PhotoBrowserCollectionViewController: UICollectionViewController, UICollec
 
 class PhotoBrowserCollectionViewCell: UICollectionViewCell {
   fileprivate let imageView = UIImageView()
+  let label = UILabel()
   
   // 为这个cell存储Alamofire的请求来加载图片
   fileprivate var request: Request?
@@ -188,6 +196,9 @@ class PhotoBrowserCollectionViewCell: UICollectionViewCell {
     
     imageView.frame = bounds
     addSubview(imageView)
+    
+    label.frame = CGRect(x: 0, y: 0, width: bounds.size.width, height: bounds.size.height / 4.0)
+    addSubview(label)
   }
 }
 
