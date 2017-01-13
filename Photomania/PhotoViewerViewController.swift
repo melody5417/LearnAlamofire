@@ -215,6 +215,26 @@ class PhotoViewerViewController: UIViewController {
   }
   
   fileprivate func downloadPhoto() {
+    // 1 请求一个新的PhotoInfo，此时请求的是xLarge大小
+    Alamofire.request(Five100px.Router.photoInfo(photoInfo!.id, .xLarge)).validate().responseJSON {
+      response in
+      guard let jsonDictionary = response.result.value as? [String: Any],
+      let imageURL = (jsonDictionary as AnyObject).value(forKeyPath: "photo.image_url") as? String else {
+        return
+      }
+      
+      // 2 获取保存文件的默认存储地址，放在Documents目录的子目录中。该子目录和服务器建议的名字相同
+      let destination: DownloadRequest.DownloadFileDestination = { _, response in
+        let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let fileURL = documentsURL.appendingPathComponent("\(self.photoInfo!.id).\(response.suggestedFilename)")
+        
+        return (fileURL, [.removePreviousFile, .createIntermediateDirectories])
+      }
+      
+      // 3
+      let _ = Alamofire.download(imageURL, to: destination)
+      
+    }
   }
   
   // MARK: Gesture Recognizers
