@@ -13,6 +13,9 @@ class PhotoBrowserCollectionViewController: UICollectionViewController, UICollec
   
   var photos = [PhotoInfo]()
   
+  // 利用缓存保存加载过的图像
+  private let imageCache = NSCache<NSString, UIImage>()
+  
   private let refreshControl = UIRefreshControl()
   
   // 当前是否在更新照片
@@ -48,21 +51,34 @@ class PhotoBrowserCollectionViewController: UICollectionViewController, UICollec
       return UICollectionViewCell()
     }
     
-    // photos中的顺序会随着插入element而改变 所以select根据index从photos set中取的photoInfo和cell生成时的可能不同
-    // 将set改为array 避免该问题
-    let id = photos[photos.index(photos.startIndex, offsetBy: indexPath.item)].id
-    cell.label.text = String(id) + "  " + String(indexPath.item)
     let imageURL = photos[photos.index(photos.startIndex, offsetBy: indexPath.item)].url
-    // 若cell移出屏幕 则取消上次请求和图片
-    cell.imageView.image = nil
+    
+    // 1 出队的单元可能已经有一个连带的 Alamorire 请求。检查这个请求是否相关，也就是说，检查该请求的 URL 是否和要显示的图片 URL 相匹配，否则就取消请求。
     cell.request?.cancel()
-    cell.request = Alamofire.request(imageURL, method: .get).responseImage {
-      response in
-      guard let image = response.result.value, response.result.error == nil else {
-        return
-      }
+    
+    // 2 使用可选值绑定来检查该图片是否有缓存版本。如果有的话，使用该缓存版本而不是再次下载。
+    if let image = imageCache.object(forKey: imageURL as NSString) {
       cell.imageView.image = image
+    } else {
+      
+      // 3 如果没有相应的缓存版本的话，那么就下载它。
+      cell.imageView.image = nil
+      
+      // 4
+      cell.request = Alamofire.request(imageURL, method: .get).responseImage {
+        response in
+        guard let image = response.result.value, response.result.error == nil else { return }
+        // 5 下载相应的图片，并在随后缓存它。
+        self.imageCache.setObject(image, forKey: response.request!.url!.absoluteString as NSString)
+        // 6
+        cell.imageView.image = image
+      }
     }
+    /*
+     如果单元格在图片下载完成之前离开了屏幕，那么我们将暂停下载，
+     并且返回一个NSURLErrorDomain (-999: cancelled)对象。这是业界普遍的处理方式。
+     */
+    
     return cell
   }
   
@@ -173,8 +189,18 @@ class PhotoBrowserCollectionViewController: UICollectionViewController, UICollec
     }
   }
   
+  // 清空您当前的集合（photos)，然后重置 currentPage，最后刷新 UI
   private dynamic func handleRefresh() {
+    refreshControl.beginRefreshing()
     
+    photos.removeAll()
+    currentPage = 1
+    
+    collectionView?.reloadData()
+    
+    refreshControl.endRefreshing()
+    
+    populatePhotos()
   }
 }
 
