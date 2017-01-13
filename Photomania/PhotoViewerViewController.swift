@@ -231,9 +231,26 @@ class PhotoViewerViewController: UIViewController {
         return (fileURL, [.removePreviousFile, .createIntermediateDirectories])
       }
       
-      // 3
-      let _ = Alamofire.download(imageURL, to: destination)
+      // 3 download progress
+      // 1 
+      let progressIndicatorView = UIProgressView(frame: CGRect(x: 0.0, y: 80.0, width: self.view.bounds.width, height: 10.0))
+      progressIndicatorView.tintColor = .blue
+      self.view.addSubview(progressIndicatorView)
       
+      // 2  1. 借助 Alamofire，我们可以通过 .downloadProgress() 来获取下载进度
+
+      let _ = Alamofire.download(imageURL, to: destination).downloadProgress { progress in
+        DispatchQueue.main.async {
+          
+          // 3     
+          progressIndicatorView.setProgress(Float(progress.fractionCompleted), animated: true)
+          
+          // 4     
+          if progress.fractionCompleted == 1 {
+            progressIndicatorView.removeFromSuperview()
+          }
+        }
+      }
     }
   }
   
